@@ -470,7 +470,8 @@ export async function renderStudentPanel(app) {
       item.className = 'assistant-message ' + (role === 'user' ? 'assistant-user' : 'assistant-model')
       const label = document.createElement('b')
       label.textContent = role === 'user' ? 'Tu' : 'Prepara IA'
-      const body = document.createElement('p')
+      const body = document.createElement('div')
+      body.className = 'assistant-body'
       if (role === 'model') body.innerHTML = renderAssistantMarkdown(text)\n      else body.textContent = text
       item.append(label, body)
       chat.append(item)
