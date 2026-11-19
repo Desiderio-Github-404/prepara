@@ -149,53 +149,153 @@ export async function renderStudentPanel(app) {
     result.id = 'study-result'
     result.className = 'study-result'
 
-    const completedCount = schedule.filter(item => item.completed).length
-    const progress = schedule.length ? Math.round((completedCount / schedule.length) * 100) : 0
-    result.innerHTML =
-      '<div class="study-result-head"><div><span class="dash-eyebrow">PLANO PERSONALIZADO</span><h2>' + esc(planData.title) + '</h2><p>' + esc(planData.goal) + ' · ' + esc(planData.exam_type) + '</p></div><button type="button" class="dash-secondary-button" id="close-study-result">Fechar</button></div>' +
-      '<div class="study-progress"><div class="study-progress-top"><b>O teu progresso</b><strong id="study-progress-value">' + progress + '%</strong></div><div class="study-progress-track"><span id="study-progress-bar" style="width:' + progress + '%"></span></div><small id="study-progress-count">' + completedCount + ' de ' + schedule.length + ' tarefas concluídas</small></div>' +
-      '<div class="study-schedule">' + schedule.map((item,index) =>
+    function updateProgress() {
+      const completedCount = schedule.filter(item => item.completed).length
+      const progress = schedule.length ? Math.round((completedCount / schedule.length) * 100) : 0
+      result.querySelector('#study-progress-value').textContent = progress + '%'
+      result.querySelector('#study-progress-bar').style.width = progress + '%'
+      result.querySelector('#study-progress-count').textContent = completedCount + ' de ' + schedule.length + ' tarefas concluídas'
+    }
+
+    function renderTasks() {
+      result.querySelector('.study-schedule').innerHTML = schedule.map((item,index) =>
         '<article class="study-day ' + (item.completed ? 'is-completed' : '') + '">' +
           '<span class="study-day-number">DIA ' + (index+1) + '</span>' +
           '<div class="study-day-content"><b>' + esc(item.label) + ' — ' + esc(item.subject) + '</b><p>' + esc(item.detail) + '</p><small>' + esc(item.minutes) + ' minutos previstos</small></div>' +
           '<label class="study-task-toggle"><input type="checkbox" data-task-index="' + index + '"' + (item.completed ? ' checked' : '') + '><span>' + (item.completed ? 'Concluída' : 'Concluir') + '</span></label>' +
         '</article>'
-      ).join('') + '</div>' +
+      ).join('')
+      result.querySelectorAll('[data-task-index]').forEach(toggle => {
+        toggle.addEventListener('change', async () => {
+          const index = Number(toggle.dataset.taskIndex)
+          const previous = schedule[index].completed
+          schedule[index].completed = toggle.checked
+          toggle.disabled = true
+          const feedback = result.querySelector('#study-save-feedback')
+          feedback.textContent = 'A guardar o progresso...'
+          const {error: updateError} = await supabase.from('study_plans')
+            .update({schedule})
+            .eq('id', planData.id)
+            .eq('user_id', session.user.id)
+          toggle.disabled = false
+          if (updateError) {
+            schedule[index].completed = previous
+            toggle.checked = previous
+            feedback.textContent = 'Não foi possível guardar. Tenta novamente.'
+            feedback.className = 'study-save-feedback error'
+          } else {
+            feedback.textContent = 'Progresso guardado.'
+            feedback.className = 'study-save-feedback success'
+            toggle.nextElementSibling.textContent = toggle.checked ? 'Concluída' : 'Concluir'
+            toggle.closest('.study-day').classList.toggle('is-completed', toggle.checked)
+            planData.schedule = schedule.map(item => ({...item}))
+            updateProgress()
+            updateReorganizeButton()
+          }
+        })
+      })
+    }
+
+    function getOverduePending() {
+      const today = new Date()
+      today.setHours(0,0,0,0)
+      return schedule.filter(item => {
+        if (item.completed || !item.date) return false
+        return new Date(item.date + 'T00:00:00') < today
+      })
+    }
+
+    function updateReorganizeButton() {
+      const button = result.querySelector('#reorganize-study-plan')
+      if (!button) return
+      button.hidden = getOverduePending().length === 0
+    }
+
+    const completedCount = schedule.filter(item => item.completed).length
+    const progress = schedule.length ? Math.round((completedCount / schedule.length) * 100) : 0
+    result.innerHTML =
+      '<div class="study-result-head"><div><span class="dash-eyebrow">PLANO PERSONALIZADO</span><h2>' + esc(planData.title) + '</h2><p>' + esc(planData.goal) + ' · ' + esc(planData.exam_type) + '</p></div><button type="button" class="dash-secondary-button" id="close-study-result">Fechar</button></div>' +
+      '<div class="study-progress"><div class="study-progress-top"><b>O teu progresso</b><strong id="study-progress-value">' + progress + '%</strong></div><div class="study-progress-track"><span id="study-progress-bar" style="width:' + progress + '%"></span></div><small id="study-progress-count">' + completedCount + ' de ' + schedule.length + ' tarefas concluídas</small></div>' +
+      '<div class="study-reorganize-box"><div><b>Ficaste com tarefas atrasadas?</b><p>A Prepara pode redistribuir as tarefas por concluir pelos dias que restam, sem alterar as que já concluíste.</p></div><button type="button" class="dash-primary-button" id="reorganize-study-plan" hidden>Reorganizar plano</button></div>' +
+      '<div class="study-schedule"></div>' +
       '<p class="study-save-feedback" id="study-save-feedback" role="status" aria-live="polite"></p>'
     area.append(result)
     result.querySelector('#close-study-result').addEventListener('click', () => result.remove())
+    renderTasks()
+    updateReorganizeButton()
 
-    result.querySelectorAll('[data-task-index]').forEach(toggle => {
-      toggle.addEventListener('change', async () => {
-        const index = Number(toggle.dataset.taskIndex)
-        const previous = schedule[index].completed
-        schedule[index].completed = toggle.checked
-        toggle.disabled = true
-        const feedback = result.querySelector('#study-save-feedback')
-        feedback.textContent = 'A guardar o progresso...'
-        const {error: updateError} = await supabase.from('study_plans')
-          .update({schedule})
-          .eq('id', planData.id)
-          .eq('user_id', session.user.id)
-        toggle.disabled = false
-        if (updateError) {
-          schedule[index].completed = previous
-          toggle.checked = previous
-          feedback.textContent = 'Não foi possível guardar. Tenta novamente.'
-          feedback.className = 'study-save-feedback error'
-        } else {
-          feedback.textContent = 'Progresso guardado.'
-          feedback.className = 'study-save-feedback success'
-          const count = schedule.filter(item => item.completed).length
-          const percentage = schedule.length ? Math.round((count / schedule.length) * 100) : 0
-          result.querySelector('#study-progress-value').textContent = percentage + '%'
-          result.querySelector('#study-progress-bar').style.width = percentage + '%'
-          result.querySelector('#study-progress-count').textContent = count + ' de ' + schedule.length + ' tarefas concluídas'
-          toggle.nextElementSibling.textContent = toggle.checked ? 'Concluída' : 'Concluir'
-          toggle.closest('.study-day').classList.toggle('is-completed', toggle.checked)
-          planData.schedule = schedule.map(item => ({...item}))
-        }
+    result.querySelector('#reorganize-study-plan').addEventListener('click', async () => {
+      const feedback = result.querySelector('#study-save-feedback')
+      const button = result.querySelector('#reorganize-study-plan')
+      const today = new Date()
+      today.setHours(0,0,0,0)
+      const examDay = new Date(planData.exam_date + 'T00:00:00')
+      const availableDays = Math.ceil((examDay - today) / 86400000) - 1
+      const pending = schedule.filter(item => !item.completed)
+      if (availableDays < 1) {
+        feedback.textContent = 'A data da avaliação já chegou ou não existem dias de estudo disponíveis. Actualiza a data da avaliação para reorganizar.'
+        feedback.className = 'study-save-feedback error'
+        return
+      }
+      if (!pending.length) {
+        feedback.textContent = 'Não existem tarefas por concluir.'
+        feedback.className = 'study-save-feedback success'
+        button.hidden = true
+        return
+      }
+
+      const dailyCapacity = Math.max(1, Math.round(Number(planData.hours_per_day) * 60))
+      const totalCapacity = dailyCapacity * availableDays
+      const minutesPerTask = Math.max(1, Math.floor(totalCapacity / pending.length))
+      const nextSchedule = schedule.filter(item => item.completed).map(item => ({...item}))
+      const pendingTasks = pending.map(item => ({...item}))
+      const buckets = Array.from({length:availableDays}, (_,index) => {
+        const day = new Date(today)
+        day.setDate(today.getDate() + index + 1)
+        return {date:day.toISOString().slice(0,10), load:0, tasks:[]}
       })
+
+      pendingTasks.forEach(task => {
+        let bucket = buckets.reduce((lightest,current) => current.load < lightest.load ? current : lightest, buckets[0])
+        const allocatedMinutes = Math.min(minutesPerTask, dailyCapacity - bucket.load)
+        if (allocatedMinutes < 1) return
+        task.date = bucket.date
+        task.label = dateValue(new Date(bucket.date + 'T00:00:00'))
+        task.minutes = allocatedMinutes
+        bucket.load += allocatedMinutes
+        bucket.tasks.push(task)
+      })
+
+      const scheduledTasks = buckets.flatMap(bucket => bucket.tasks)
+      if (scheduledTasks.length !== pendingTasks.length) {
+        feedback.textContent = 'Não foi possível distribuir todas as tarefas dentro do tempo diário disponível. Reduz o número de tarefas ou aumenta as horas de estudo.'
+        feedback.className = 'study-save-feedback error'
+        return
+      }
+      const completedTasks = schedule.filter(item => item.completed)
+      const reordered = [...completedTasks, ...scheduledTasks].sort((a,b) => a.date.localeCompare(b.date))
+      button.disabled = true
+      button.textContent = 'A reorganizar...'
+      feedback.textContent = 'A distribuir as tarefas pelos dias disponíveis...'
+      feedback.className = 'study-save-feedback'
+      const {error: updateError} = await supabase.from('study_plans')
+        .update({schedule:reordered})
+        .eq('id', planData.id)
+        .eq('user_id', session.user.id)
+      button.disabled = false
+      button.textContent = 'Reorganizar plano'
+      if (updateError) {
+        feedback.textContent = 'Não foi possível guardar o novo calendário. O plano anterior foi mantido.'
+        feedback.className = 'study-save-feedback error'
+        return
+      }
+      schedule = reordered
+      planData.schedule = schedule.map(item => ({...item}))
+      renderTasks()
+      updateProgress()
+      updateReorganizeButton()
+      feedback.textContent = 'Plano reorganizado e guardado. As tarefas concluídas foram preservadas.'
+      feedback.className = 'study-save-feedback success'
     })
     result.scrollIntoView({behavior:'smooth',block:'start'})
   }
