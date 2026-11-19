@@ -502,7 +502,7 @@ export async function renderStudentPanel(app) {
         })
         const result = await response.json()
         if (!response.ok) throw new Error(result.error || 'Não foi possível obter uma resposta.')
-        pending.querySelector('p').innerHTML = renderAssistantMarkdown(result.answer)
+        pending.querySelector('.assistant-body').innerHTML = renderAssistantMarkdown(result.answer)
         history.push({role:'user',text:question},{role:'model',text:result.answer})
         history = history.slice(-8)
         feedback.textContent = 'Resposta gerada. Continua a perguntar para aprofundares a matéria.'
