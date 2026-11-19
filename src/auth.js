@@ -142,16 +142,61 @@ export async function renderStudentPanel(app) {
     }))
   }
 
-  function showStudySchedule(area, planData) {
-    const schedule = Array.isArray(planData.schedule) ? planData.schedule : []
+  async function showStudySchedule(area, planData) {
+    let schedule = Array.isArray(planData.schedule) ? planData.schedule.map(item => ({...item, completed: item.completed === true})) : []
     area.querySelector('#study-result')?.remove()
     const result = document.createElement('section')
     result.id = 'study-result'
     result.className = 'study-result'
-    result.innerHTML = '<div class="study-result-head"><div><span class="dash-eyebrow">PLANO PERSONALIZADO</span><h2>' + esc(planData.title) + '</h2><p>' + esc(planData.goal) + ' · ' + esc(planData.exam_type) + '</p></div><button type="button" class="dash-secondary-button" id="close-study-result">Fechar</button></div><div class="study-schedule">' + schedule.map((item,index) => '<article class="study-day"><span class="study-day-number">DIA ' + (index+1) + '</span><div><b>' + esc(item.label) + ' — ' + esc(item.subject) + '</b><p>' + esc(item.detail) + '</p><small>' + esc(item.minutes) + ' minutos previstos</small></div></article>').join('') + '</div>'
-    area.querySelector('#study-result')?.remove()
+
+    const completedCount = schedule.filter(item => item.completed).length
+    const progress = schedule.length ? Math.round((completedCount / schedule.length) * 100) : 0
+    result.innerHTML =
+      '<div class="study-result-head"><div><span class="dash-eyebrow">PLANO PERSONALIZADO</span><h2>' + esc(planData.title) + '</h2><p>' + esc(planData.goal) + ' · ' + esc(planData.exam_type) + '</p></div><button type="button" class="dash-secondary-button" id="close-study-result">Fechar</button></div>' +
+      '<div class="study-progress"><div class="study-progress-top"><b>O teu progresso</b><strong id="study-progress-value">' + progress + '%</strong></div><div class="study-progress-track"><span id="study-progress-bar" style="width:' + progress + '%"></span></div><small id="study-progress-count">' + completedCount + ' de ' + schedule.length + ' tarefas concluídas</small></div>' +
+      '<div class="study-schedule">' + schedule.map((item,index) =>
+        '<article class="study-day ' + (item.completed ? 'is-completed' : '') + '">' +
+          '<span class="study-day-number">DIA ' + (index+1) + '</span>' +
+          '<div class="study-day-content"><b>' + esc(item.label) + ' — ' + esc(item.subject) + '</b><p>' + esc(item.detail) + '</p><small>' + esc(item.minutes) + ' minutos previstos</small></div>' +
+          '<label class="study-task-toggle"><input type="checkbox" data-task-index="' + index + '"' + (item.completed ? ' checked' : '') + '><span>' + (item.completed ? 'Concluída' : 'Concluir') + '</span></label>' +
+        '</article>'
+      ).join('') + '</div>' +
+      '<p class="study-save-feedback" id="study-save-feedback" role="status" aria-live="polite"></p>'
     area.append(result)
     result.querySelector('#close-study-result').addEventListener('click', () => result.remove())
+
+    result.querySelectorAll('[data-task-index]').forEach(toggle => {
+      toggle.addEventListener('change', async () => {
+        const index = Number(toggle.dataset.taskIndex)
+        const previous = schedule[index].completed
+        schedule[index].completed = toggle.checked
+        toggle.disabled = true
+        const feedback = result.querySelector('#study-save-feedback')
+        feedback.textContent = 'A guardar o progresso...'
+        const {error: updateError} = await supabase.from('study_plans')
+          .update({schedule})
+          .eq('id', planData.id)
+          .eq('user_id', session.user.id)
+        toggle.disabled = false
+        if (updateError) {
+          schedule[index].completed = previous
+          toggle.checked = previous
+          feedback.textContent = 'Não foi possível guardar. Tenta novamente.'
+          feedback.className = 'study-save-feedback error'
+        } else {
+          feedback.textContent = 'Progresso guardado.'
+          feedback.className = 'study-save-feedback success'
+          const count = schedule.filter(item => item.completed).length
+          const percentage = schedule.length ? Math.round((count / schedule.length) * 100) : 0
+          result.querySelector('#study-progress-value').textContent = percentage + '%'
+          result.querySelector('#study-progress-bar').style.width = percentage + '%'
+          result.querySelector('#study-progress-count').textContent = count + ' de ' + schedule.length + ' tarefas concluídas'
+          toggle.nextElementSibling.textContent = toggle.checked ? 'Concluída' : 'Concluir'
+          toggle.closest('.study-day').classList.toggle('is-completed', toggle.checked)
+          planData.schedule = schedule.map(item => ({...item}))
+        }
+      })
+    })
     result.scrollIntoView({behavior:'smooth',block:'start'})
   }
 
