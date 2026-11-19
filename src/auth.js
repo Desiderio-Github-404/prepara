@@ -88,6 +88,135 @@ export async function renderStudentPanel(app) {
   const items = [['overview','Visão geral','home'],['study','Plano de estudos','calendar'],['exams','Gerar simulados','file'],['assistant','Assistente IA','spark'],['history','Histórico','history'],['account','Minha conta','user']]
   let view = 'overview'
 
+  function dateValue(date) {
+    return new Intl.DateTimeFormat('pt-AO',{day:'2-digit',month:'2-digit'}).format(date)
+  }
+
+  function buildStudySchedule(input) {
+    const start = new Date()
+    start.setHours(0,0,0,0)
+    const end = new Date(input.exam_date + 'T00:00:00')
+    const totalDays = Math.max(1, Math.ceil((end - start) / 86400000))
+    const studyDays = Math.max(1, Math.min(totalDays, 60))
+    const subjects = input.subjects
+    const tasks = []
+    for (let i = 0; i < studyDays; i++) {
+      const day = new Date(start)
+      day.setDate(start.getDate() + i)
+      const subject = subjects[i % subjects.length]
+      const secondSubject = subjects.length > 1 ? subjects[(i + 1) % subjects.length] : null
+      const isReview = (i + 1) % 6 === 0 || i === studyDays - 1
+      tasks.push({
+        date: day.toISOString().slice(0,10),
+        label: dateValue(day),
+        subject: isReview ? 'Revisão geral' : subject,
+        detail: isReview
+          ? 'Rever apontamentos, resolver questões e identificar dúvidas.'
+          : 'Estudar os conceitos principais, fazer apontamentos e resolver exercícios.' + (secondSubject && input.hours_per_day >= 2 ? ' Reservar parte do tempo para ' + secondSubject + '.' : ''),
+        minutes: Math.round(Number(input.hours_per_day) * 60),
+        completed: false
+      })
+    }
+    return tasks
+  }
+
+  async function loadStudyPlans(area) {
+    const {data, error} = await supabase.from('study_plans')
+      .select('id,title,goal,academic_level,exam_type,exam_date,subjects,hours_per_day,knowledge_level,schedule,created_at')
+      .eq('user_id', session.user.id)
+      .order('created_at',{ascending:false})
+      .limit(10)
+    if (error) {
+      area.querySelector('#study-plans-list').innerHTML = '<p class="study-feedback error">Não foi possível carregar os planos. Confirma se já executaste o SQL de configuração.</p>'
+      return
+    }
+    const list = area.querySelector('#study-plans-list')
+    if (!data?.length) {
+      list.innerHTML = '<div class="study-empty">Ainda não guardaste nenhum plano. Preenche o formulário para criares o primeiro.</div>'
+      return
+    }
+    list.innerHTML = data.map(p => '<article class="study-saved-card"><div><span class="dash-eyebrow">' + esc(p.exam_type) + ' · ' + esc(p.academic_level) + '</span><h3>' + esc(p.title) + '</h3><p>' + esc((p.subjects || []).join(', ')) + '</p><small>Avaliação: ' + esc(p.exam_date) + ' · ' + esc(p.hours_per_day) + ' h/dia</small></div><button type="button" class="dash-secondary-button" data-plan-id="' + esc(p.id) + '">Ver plano</button></article>').join('')
+    list.querySelectorAll('[data-plan-id]').forEach(button => button.addEventListener('click', () => {
+      const selected = data.find(p => p.id === button.dataset.planId)
+      if (selected) showStudySchedule(area, selected)
+    }))
+  }
+
+  function showStudySchedule(area, planData) {
+    const schedule = Array.isArray(planData.schedule) ? planData.schedule : []
+    area.querySelector('#study-result')?.remove()
+    const result = document.createElement('section')
+    result.id = 'study-result'
+    result.className = 'study-result'
+    result.innerHTML = '<div class="study-result-head"><div><span class="dash-eyebrow">PLANO PERSONALIZADO</span><h2>' + esc(planData.title) + '</h2><p>' + esc(planData.goal) + ' · ' + esc(planData.exam_type) + '</p></div><button type="button" class="dash-secondary-button" id="close-study-result">Fechar</button></div><div class="study-schedule">' + schedule.map((item,index) => '<article class="study-day"><span class="study-day-number">DIA ' + (index+1) + '</span><div><b>' + esc(item.label) + ' — ' + esc(item.subject) + '</b><p>' + esc(item.detail) + '</p><small>' + esc(item.minutes) + ' minutos previstos</small></div></article>').join('') + '</div>'
+    area.querySelector('#study-result')?.remove()
+    area.append(result)
+    result.querySelector('#close-study-result').addEventListener('click', () => result.remove())
+    result.scrollIntoView({behavior:'smooth',block:'start'})
+  }
+
+  function renderStudyTool(area) {
+    area.innerHTML = '<section class="study-builder"><div class="study-builder-heading"><span class="dash-eyebrow">PLANEAMENTO INTELIGENTE</span><h1>Cria o teu plano de estudos.</h1><p>Conta-nos o que precisas de preparar. A Prepara vai organizar uma rotina prática para começares hoje.</p></div><form id="study-form" class="study-form"><label>Classe ou nível académico<select name="academic_level" required><option value="">Selecciona</option><option>7.ª classe</option><option>8.ª classe</option><option>9.ª classe</option><option>10.ª classe</option><option>11.ª classe</option><option>12.ª classe</option><option>13.ª classe</option><option>Ensino superior</option><option>Outro</option></select></label><label>Objectivo<select name="goal" required><option value="">Selecciona</option><option>Preparação para exame nacional</option><option>Exame de acesso</option><option>Prova trimestral</option><option>Preparação geral</option></select></label><label>Tipo de avaliação<select name="exam_type" required><option value="">Selecciona</option><option>Exame nacional</option><option>Exame de acesso</option><option>Prova trimestral</option><option>Teste</option><option>Estudo autónomo</option></select></label><label>Data da avaliação<input name="exam_date" type="date" min="' + new Date().toISOString().slice(0,10) + '" required></label><label>Horas disponíveis por dia<select name="hours_per_day" required><option value="">Selecciona</option><option value="1">1 hora</option><option value="2">2 horas</option><option value="3">3 horas</option><option value="4">4 horas</option><option value="5">5 horas</option><option value="6">6 horas</option></select></label><label>Nível de conhecimento<select name="knowledge_level" required><option value="">Selecciona</option><option>Iniciante</option><option>Intermédio</option><option>Avançado</option></select></label><fieldset class="study-subjects"><legend>Disciplinas que precisas de estudar</legend><div class="study-subject-grid">' + ['Matemática','Física','Química','Biologia','Língua Portuguesa','Inglês','Informática','Electrónica','Telecomunicações','História','Geografia','Outra'].map(s => '<label><input type="checkbox" name="subjects" value="' + s + '"><span>' + s + '</span></label>').join('') + '</div></fieldset><label class="study-title-field">Nome do plano<input name="title" type="text" maxlength="80" placeholder="Ex.: Preparação para o exame de acesso" required></label><p class="study-feedback" id="study-feedback" role="status" hidden></p><button class="dash-primary-button study-submit" type="submit">Gerar o meu plano ' + arrow + '</button></form></section><section class="study-library"><div class="dash-section-title"><div><span class="dash-eyebrow">OS TEUS PLANOS</span><h2>Planos guardados</h2></div></div><div id="study-plans-list"><p class="study-empty">A carregar os teus planos...</p></div></section>'
+    loadStudyPlans(area)
+    const form = area.querySelector('#study-form')
+    form.addEventListener('submit', async event => {
+      event.preventDefault()
+      const data = new FormData(form)
+      const subjects = data.getAll('subjects')
+      const feedback = area.querySelector('#study-feedback')
+      if (!subjects.length) {
+        feedback.textContent = 'Selecciona pelo menos uma disciplina.'
+        feedback.hidden = false
+        feedback.className = 'study-feedback error'
+        return
+      }
+      const examDate = new Date(String(data.get('exam_date')) + 'T00:00:00')
+      const today = new Date(); today.setHours(0,0,0,0)
+      const days = Math.ceil((examDate - today) / 86400000)
+      if (days < 1 || days > 60) {
+        feedback.textContent = 'Escolhe uma data entre amanhã e os próximos 60 dias. Depois poderemos ampliar o calendário.'
+        feedback.hidden = false
+        feedback.className = 'study-feedback error'
+        return
+      }
+      const input = {
+        title:String(data.get('title')).trim(),
+        goal:String(data.get('goal')),
+        academic_level:String(data.get('academic_level')),
+        exam_type:String(data.get('exam_type')),
+        exam_date:String(data.get('exam_date')),
+        subjects,
+        hours_per_day:Number(data.get('hours_per_day')),
+        knowledge_level:String(data.get('knowledge_level'))
+      }
+      const schedule = buildStudySchedule(input)
+      const submit = form.querySelector('button[type="submit"]')
+      submit.disabled = true
+      submit.textContent = 'A organizar o teu plano...'
+      feedback.hidden = true
+      try {
+        const {data:saved,error:saveError} = await supabase.from('study_plans').insert({
+          user_id:session.user.id,
+          ...input,
+          schedule
+        }).select('id,title,goal,academic_level,exam_type,exam_date,subjects,hours_per_day,knowledge_level,schedule,created_at').single()
+        if (saveError) throw saveError
+        feedback.textContent = 'Plano criado e guardado com sucesso.'
+        feedback.className = 'study-feedback success'
+        feedback.hidden = false
+        showStudySchedule(area,saved)
+        await loadStudyPlans(area)
+      } catch (saveError) {
+        feedback.textContent = saveError.message || 'Não foi possível guardar o plano. Verifica a configuração da base de dados.'
+        feedback.className = 'study-feedback error'
+        feedback.hidden = false
+      } finally {
+        submit.disabled = false
+        submit.innerHTML = 'Gerar o meu plano ' + arrow
+      }
+    })
+  }
+
   function renderContent() {
     const area = document.querySelector('#dashboard-content')
     if (!area) return
@@ -103,7 +232,9 @@ export async function renderStudentPanel(app) {
         (plan === 'pro' ? '<section class="dash-pro-card"><div class="dash-pro-icon">' + ico('book') + '</div><div><span class="dash-eyebrow">BENEFÍCIOS PRO</span><h3>O teu acompanhamento exclusivo</h3><p>O livro de técnicas de estudo e as aulas semanais estarão reunidos nesta área.</p></div><button class="dash-secondary-button" data-open-view="pro">Ver benefícios ' + arrow + '</button></section>' :
         '<section class="dash-upgrade-card"><div><span class="dash-eyebrow">QUERES IR MAIS LONGE?</span><h3>Descobre a experiência Prepara Pro.</h3><p>Inclui técnicas de estudo e acompanhamento semanal.</p></div><a class="dash-primary-button" href="#planos">Conhecer o Pro ' + arrow + '</a></section>') +
         '<p class="dash-footnote">O painel está em desenvolvimento. As ferramentas serão activadas nas próximas etapas.</p>'
-    } else if (['study','exams','assistant'].includes(view)) {
+    } else if (view === 'study') {
+      renderStudyTool(area)
+    } else if (['exams','assistant'].includes(view)) {
       const d = {
         study:['PLANEAMENTO INTELIGENTE','O teu plano de estudos','Vamos transformar os teus objectivos num calendário de preparação.','O gerador será implementado nesta etapa. Poderás indicar a prova, as disciplinas, a data e o tempo disponível.'],
         exams:['PRÁTICA E AVALIAÇÃO','Gerar provas e simulados','Testa os teus conhecimentos antes do dia da avaliação.','O gerador será implementado nesta etapa, com selecção de disciplina, matéria, dificuldade e correcção.'],
