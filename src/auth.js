@@ -100,21 +100,55 @@ export async function renderStudentPanel(app) {
     window.location.hash = '#entrar'
     return
   }
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
+
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+  if (sessionError || !session) {
     window.location.hash = '#entrar'
     return
   }
 
   const name = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Estudante'
-  const { data: subscriptions } = await supabase
+
+  // Primeiro lemos todas as subscrições deste utilizador para diagnosticar
+  // estados diferentes de "active" e evitar esconder erros do Supabase.
+  const { data: subscriptions, error: subscriptionError } = await supabase
     .from('subscriptions')
-    .select('plan,status,expires_at,created_at')
+    .select('plan,status,expires_at,created_at,user_id')
     .eq('user_id', session.user.id)
-    .eq('status', 'active')
     .order('created_at', { ascending: false })
-    .limit(1)
-  const active = subscriptions?.[0]
+    .limit(5)
+
+  if (subscriptionError) {
+    app.innerHTML = authShell(`
+      <div class="auth-eyebrow">ÁREA DO ESTUDANTE</div>
+      <h1>Olá, ${escapeHtml(name)}.</h1>
+      <p class="auth-description">A tua conta está autenticada, mas não conseguimos consultar a subscrição.</p>
+      <div class="setup-callout"><strong>Erro do Supabase:</strong><br>${escapeHtml(subscriptionError.message)}<br><br><strong>Conta autenticada:</strong><br>${escapeHtml(session.user.email || 'E-mail não disponível')}</div>
+      <button class="button button-outline auth-submit" id="logout-button" type="button">Terminar sessão</button>
+    `)
+    document.querySelector('#logout-button').addEventListener('click', async () => {
+      await supabase.auth.signOut()
+      window.location.hash = '#inicio'
+    })
+    return
+  }
+
+  const now = Date.now()
+  const active = (subscriptions || []).find(item =>
+    item.status === 'active' && (!item.expires_at || new Date(item.expires_at).getTime() > now)
+  )
+  const latest = subscriptions?.[0]
+
+  let planTitle = 'Ainda não tens um plano ativo'
+  let planDescription = 'Escolhe um plano na página inicial e conclui a inscrição para desbloqueares as ferramentas.'
+  if (active) {
+    planTitle = active.plan.toUpperCase()
+    planDescription = 'A tua subscrição está ativa.'
+  } else if (latest) {
+    planDescription = `Encontrámos uma subscrição com estado "${latest.status}". Se acabaste de efectuar uma activação, confirma os dados no Supabase.`
+  } else {
+    planDescription = 'Não encontrámos subscrições associadas a esta conta.'
+  }
 
   app.innerHTML = authShell(`
     <div class="auth-eyebrow">ÁREA DO ESTUDANTE</div>
@@ -122,8 +156,9 @@ export async function renderStudentPanel(app) {
     <p class="auth-description">Bem-vindo à tua área pessoal da Prepara.</p>
     <div class="student-plan">
       <span class="student-plan-label">O TEU PLANO</span>
-      <strong>${active ? escapeHtml(active.plan.toUpperCase()) : 'Ainda não tens um plano ativo'}</strong>
-      <p>${active ? 'A tua subscrição está ativa.' : 'Escolhe um plano na página inicial e conclui a inscrição para desbloqueares as ferramentas.'}</p>
+      <strong>${escapeHtml(planTitle)}</strong>
+      <p>${escapeHtml(planDescription)}</p>
+      <small style="display:block;margin-top:10px;opacity:.7">Conta: ${escapeHtml(session.user.email || '')}</small>
     </div>
     <div class="student-actions">
       <a class="button button-primary auth-submit" href="#planos">Ver planos ${iconArrow}</a>
