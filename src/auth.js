@@ -472,7 +472,8 @@ export async function renderStudentPanel(app) {
       label.textContent = role === 'user' ? 'Tu' : 'Prepara IA'
       const body = document.createElement('div')
       body.className = 'assistant-body'
-      if (role === 'model') body.innerHTML = renderAssistantMarkdown(text)\n      else body.textContent = text
+      if (role === 'model') body.innerHTML = renderAssistantMarkdown(text)
+      else body.textContent = text
       item.append(label, body)
       chat.append(item)
       chat.scrollTop = chat.scrollHeight
