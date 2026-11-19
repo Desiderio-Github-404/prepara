@@ -74,3 +74,12 @@
 .study-save-feedback{min-height:16px;margin:12px 0 0;font-size:9px;color:#9994a2}
 .study-save-feedback.success{color:#a9e8c2}.study-save-feedback.error{color:#ffb4b4}
 @media(max-width:650px){.study-task-toggle{align-self:flex-start}.study-day{flex-wrap:wrap}.study-day-content{flex:1 1 calc(100% - 55px)}}
+
+
+/* Reorganização de planos de estudo */
+.study-reorganize-box{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 16px;padding:15px;border:1px solid #8e5ae744;border-radius:9px;background:#2b203c55}
+.study-reorganize-box b{font-size:11px;color:#e7dcf8}
+.study-reorganize-box p{font-size:10px;line-height:1.7;color:#aaa2b4;margin:6px 0 0;max-width:540px}
+.study-reorganize-box button[hidden]{display:none}
+.study-reorganize-box button:disabled{opacity:.6;cursor:wait}
+@media(max-width:650px){.study-reorganize-box{align-items:flex-start;flex-direction:column}.study-reorganize-box button{width:100%}}
