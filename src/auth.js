@@ -252,7 +252,7 @@ export async function renderStudentPanel(app) {
       const buckets = Array.from({length:availableDays}, (_,index) => {
         const day = new Date(today)
         day.setDate(today.getDate() + index + 1)
-        return {date:day.toISOString().slice(0,10), load:0, tasks:[]}
+        return {date:day.getFullYear() + '-' + String(day.getMonth()+1).padStart(2,'0') + '-' + String(day.getDate()).padStart(2,'0'), load:0, tasks:[]}
       })
 
       pendingTasks.forEach(task => {
