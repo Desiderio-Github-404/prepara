@@ -57,3 +57,20 @@
 .study-day p{font-size:10px;line-height:1.7;color:#aaa4b4;margin:6px 0}
 .study-day small{font-size:9px;color:#8f8998}
 @media(max-width:650px){.study-builder{padding:20px 16px}.study-form{grid-template-columns:1fr}.study-subjects,.study-title-field,.study-submit,.study-feedback{grid-column:1}.study-subject-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.study-saved-card,.study-result-head{align-items:flex-start;flex-direction:column}.study-day{gap:9px}}
+
+/* Progresso e conclusão das tarefas do plano */
+.study-progress{padding:16px;margin:0 0 16px;border:1px solid #8e5ae733;border-radius:9px;background:#2b203c55}
+.study-progress-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.study-progress-top b{font-size:11px}.study-progress-top strong{font:800 17px var(--heading);color:#c3a6ff}
+.study-progress-track{height:8px;overflow:hidden;border-radius:20px;background:#ffffff15}
+.study-progress-track span{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,#8050d5,#c3a6ff);transition:width .25s}
+.study-progress>small{display:block;margin-top:8px;color:#9994a2;font-size:9px}
+.study-day-content{flex:1;min-width:0}
+.study-day.is-completed{border-color:#4d9b6b66;background:#1c2922}
+.study-day.is-completed .study-day-content>b{color:#a9e8c2}
+.study-task-toggle{display:flex;align-items:center;gap:6px;flex:none;color:#b99aff;font-size:9px;cursor:pointer}
+.study-task-toggle input{accent-color:#9a70e8;width:14px;height:14px}
+.study-task-toggle input:disabled{opacity:.5}
+.study-save-feedback{min-height:16px;margin:12px 0 0;font-size:9px;color:#9994a2}
+.study-save-feedback.success{color:#a9e8c2}.study-save-feedback.error{color:#ffb4b4}
+@media(max-width:650px){.study-task-toggle{align-self:flex-start}.study-day{flex-wrap:wrap}.study-day-content{flex:1 1 calc(100% - 55px)}}
