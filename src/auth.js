@@ -363,6 +363,91 @@ export async function renderStudentPanel(app) {
   }
 
 
+
+  function renderAssistantMarkdown(source) {
+    const escapeHtml = value => value.replace(/[&<>"']/g, char => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[char]))
+    const inline = value => escapeHtml(value)
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    const lines = String(source || '').replace(/\r/g, '').split('\n')
+    const output = []
+    let paragraph = []
+    let listType = null
+    let listItems = []
+    let code = false
+    let codeLines = []
+    let math = false
+    let mathLines = []
+
+    const flushParagraph = () => {
+      if (paragraph.length) {
+        output.push('<p>' + paragraph.map(inline).join('<br>') + '</p>')
+        paragraph = []
+      }
+    }
+    const flushList = () => {
+      if (listItems.length) {
+        output.push('<' + listType + '>' + listItems.map(item => '<li>' + inline(item) + '</li>').join('') + '</' + listType + '>')
+        listItems = []
+        listType = null
+      }
+    }
+
+    for (const line of lines) {
+      if (line.trim().startsWith('```')) {
+        flushParagraph(); flushList()
+        if (code) {
+          output.push('<pre><code>' + escapeHtml(codeLines.join('\n')) + '</code></pre>')
+          codeLines = []
+        }
+        code = !code
+        continue
+      }
+      if (code) { codeLines.push(line); continue }
+      if (line.trim() === '$') {
+        flushParagraph(); flushList()
+        if (math) {
+          output.push('<div class="assistant-math">' + escapeHtml(mathLines.join('\n')) + '</div>')
+          mathLines = []
+        }
+        math = !math
+        continue
+      }
+      if (math) { mathLines.push(line); continue }
+      const trimmed = line.trim()
+      if (!trimmed) { flushParagraph(); flushList(); continue }
+      const heading = trimmed.match(/^(#{1,3})\s+(.+)$/)
+      if (heading) {
+        flushParagraph(); flushList()
+        const level = heading[1].length
+        output.push('<h' + level + '>' + inline(heading[2]) + '</h' + level + '>')
+        continue
+      }
+      if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+        flushParagraph(); flushList(); output.push('<hr>'); continue
+      }
+      const bullet = trimmed.match(/^[-*]\s+(.+)$/)
+      const numbered = trimmed.match(/^\d+[.)]\s+(.+)$/)
+      if (bullet || numbered) {
+        flushParagraph()
+        const type = bullet ? 'ul' : 'ol'
+        if (listType && listType !== type) flushList()
+        listType = type
+        listItems.push((bullet || numbered)[1])
+        continue
+      }
+      flushList()
+      paragraph.push(trimmed)
+    }
+    flushParagraph(); flushList()
+    if (codeLines.length) output.push('<pre><code>' + escapeHtml(codeLines.join('\n')) + '</code></pre>')
+    if (mathLines.length) output.push('<div class="assistant-math">' + escapeHtml(mathLines.join('\n')) + '</div>')
+    return output.join('')
+  }
+
   function renderAssistant(area) {
     let history = []
     area.innerHTML =
@@ -386,7 +471,7 @@ export async function renderStudentPanel(app) {
       const label = document.createElement('b')
       label.textContent = role === 'user' ? 'Tu' : 'Prepara IA'
       const body = document.createElement('p')
-      body.textContent = text
+      if (role === 'model') body.innerHTML = renderAssistantMarkdown(text)\n      else body.textContent = text
       item.append(label, body)
       chat.append(item)
       chat.scrollTop = chat.scrollHeight
@@ -416,7 +501,7 @@ export async function renderStudentPanel(app) {
         })
         const result = await response.json()
         if (!response.ok) throw new Error(result.error || 'Não foi possível obter uma resposta.')
-        pending.querySelector('p').textContent = result.answer
+        pending.querySelector('p').innerHTML = renderAssistantMarkdown(result.answer)
         history.push({role:'user',text:question},{role:'model',text:result.answer})
         history = history.slice(-8)
         feedback.textContent = 'Resposta gerada. Continua a perguntar para aprofundares a matéria.'
