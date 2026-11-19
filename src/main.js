@@ -33,14 +33,13 @@ app.innerHTML = `
   <header class="site-header">
     <div class="container nav-wrap">
       <a class="brand" href="#inicio" aria-label="Prepara — início"><span class="brand-mark">P</span><span>prepara<span class="brand-dot">.</span></span></a>
-      <button class="menu-toggle" aria-label="Abrir menu" aria-expanded="false">${icon('menu')}</button>
-      <div class="header-actions"><a class="login-link" href="#entrar">Entrar</a><a class="button button-small button-outline header-cta" href="#criar-conta">Criar conta</a></div>
       <nav class="main-nav" aria-label="Navegação principal">
         <a href="#funcionalidades">Funcionalidades</a>
         <a href="#como-funciona">Como funciona</a>
         <a href="#planos">Planos</a>
       </nav>
-      <a class="button button-small button-outline header-cta" href="#planos">Começar agora ${icon('arrow')}</a>
+      <div class="header-actions"><a class="login-link" href="#entrar">Entrar</a><a class="button button-small button-outline header-cta" href="#criar-conta">Criar conta</a></div>
+      <button class="menu-toggle" aria-label="Abrir menu" aria-expanded="false">${icon('menu')}</button>
     </div>
   </header>
 
