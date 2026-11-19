@@ -362,6 +362,79 @@ export async function renderStudentPanel(app) {
     })
   }
 
+
+  function renderAssistant(area) {
+    let history = []
+    area.innerHTML =
+      '<section class="assistant-panel">' +
+        '<div class="assistant-heading"><span class="dash-eyebrow">APRENDIZAGEM COM IA</span><h1>Assistente académico.</h1><p>Faz perguntas, pede explicações passo a passo e aprofunda as matérias que estás a estudar.</p></div>' +
+        '<div class="assistant-notice">O assistente é uma ferramenta de apoio ao estudo. Confirma sempre fórmulas, dados e orientações importantes com os teus materiais e professores.</div>' +
+        '<div class="assistant-chat" id="assistant-chat" aria-live="polite"><div class="assistant-message assistant-model"><b>Prepara IA</b><p>Olá! Sou o teu assistente académico. Qual é a matéria ou dúvida que vamos trabalhar hoje?</p></div></div>' +
+        '<form class="assistant-form" id="assistant-form"><textarea id="assistant-question" rows="3" maxlength="4000" placeholder="Escreve a tua pergunta..." required></textarea><div class="assistant-form-bottom"><small>Até 4.000 caracteres</small><button class="dash-primary-button" type="submit">Enviar pergunta ' + arrow + '</button></div></form>' +
+        '<p class="assistant-feedback" id="assistant-feedback" role="status" aria-live="polite"></p>' +
+      '</section>'
+
+    const chat = area.querySelector('#assistant-chat')
+    const form = area.querySelector('#assistant-form')
+    const input = area.querySelector('#assistant-question')
+    const submit = form.querySelector('button[type="submit"]')
+    const feedback = area.querySelector('#assistant-feedback')
+
+    function addMessage(role, text) {
+      const item = document.createElement('article')
+      item.className = 'assistant-message ' + (role === 'user' ? 'assistant-user' : 'assistant-model')
+      const label = document.createElement('b')
+      label.textContent = role === 'user' ? 'Tu' : 'Prepara IA'
+      const body = document.createElement('p')
+      body.textContent = text
+      item.append(label, body)
+      chat.append(item)
+      chat.scrollTop = chat.scrollHeight
+      return item
+    }
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault()
+      const question = input.value.trim()
+      if (!question) return
+      addMessage('user', question)
+      input.value = ''
+      input.disabled = true
+      submit.disabled = true
+      submit.textContent = 'A pensar...'
+      feedback.textContent = 'A preparar uma explicação...'
+      feedback.className = 'assistant-feedback'
+      const pending = addMessage('model', 'Estou a analisar a tua pergunta...')
+      try {
+        const response = await fetch('/api/assistant', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + session.access_token
+          },
+          body: JSON.stringify({message:question, history})
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || 'Não foi possível obter uma resposta.')
+        pending.querySelector('p').textContent = result.answer
+        history.push({role:'user',text:question},{role:'model',text:result.answer})
+        history = history.slice(-8)
+        feedback.textContent = 'Resposta gerada. Continua a perguntar para aprofundares a matéria.'
+        feedback.className = 'assistant-feedback success'
+      } catch (error) {
+        pending.remove()
+        addMessage('model', error.message || 'Ocorreu um erro. Tenta novamente.')
+        feedback.textContent = 'Não foi possível concluir o pedido.'
+        feedback.className = 'assistant-feedback error'
+      } finally {
+        input.disabled = false
+        submit.disabled = false
+        submit.innerHTML = 'Enviar pergunta ' + arrow
+        input.focus()
+      }
+    })
+  }
+
   function renderContent() {
     const area = document.querySelector('#dashboard-content')
     if (!area) return
@@ -379,13 +452,11 @@ export async function renderStudentPanel(app) {
         '<p class="dash-footnote">O painel está em desenvolvimento. As ferramentas serão activadas nas próximas etapas.</p>'
     } else if (view === 'study') {
       renderStudyTool(area)
-    } else if (['exams','assistant'].includes(view)) {
-      const d = {
-        study:['PLANEAMENTO INTELIGENTE','O teu plano de estudos','Vamos transformar os teus objectivos num calendário de preparação.','O gerador será implementado nesta etapa. Poderás indicar a prova, as disciplinas, a data e o tempo disponível.'],
-        exams:['PRÁTICA E AVALIAÇÃO','Gerar provas e simulados','Testa os teus conhecimentos antes do dia da avaliação.','O gerador será implementado nesta etapa, com selecção de disciplina, matéria, dificuldade e correcção.'],
-        assistant:['APRENDIZAGEM COM IA','Assistente académico','Faz perguntas e compreende a matéria com explicações passo a passo.','O assistente será ligado ao modelo de IA numa etapa própria, com respostas orientadas para aprendizagem.']
-      }[view]
-      area.innerHTML = '<section class="dash-placeholder"><span class="dash-placeholder-icon">' + ico(view === 'study' ? 'calendar' : view === 'exams' ? 'file' : 'spark') + '</span><span class="dash-eyebrow">' + d[0] + '</span><h1>' + d[1] + '</h1><p class="dash-placeholder-lead">' + d[2] + '</p><div class="dash-coming-soon"><b>EM DESENVOLVIMENTO</b><p>' + d[3] + '</p></div><button class="dash-secondary-button" data-open-view="overview">Voltar à visão geral</button></section>'
+    } else if (view === 'assistant') {
+      renderAssistant(area)
+    } else if (view === 'exams') {
+      const d = ['PRÁTICA E AVALIAÇÃO','Gerar provas e simulados','Testa os teus conhecimentos antes do dia da avaliação.','O gerador será implementado nesta etapa, com selecção de disciplina, matéria, dificuldade e correcção.']
+      area.innerHTML = '<section class="dash-placeholder"><span class="dash-placeholder-icon">' + ico('file') + '</span><span class="dash-eyebrow">' + d[0] + '</span><h1>' + d[1] + '</h1><p class="dash-placeholder-lead">' + d[2] + '</p><div class="dash-coming-soon"><b>EM DESENVOLVIMENTO</b><p>' + d[3] + '</p></div><button class="dash-secondary-button" data-open-view="overview">Voltar à visão geral</button></section>'
     } else if (view === 'history') {
       area.innerHTML = '<section class="dash-placeholder"><span class="dash-placeholder-icon">' + ico('history') + '</span><span class="dash-eyebrow">A TUA EVOLUÇÃO</span><h1>Histórico de actividades</h1><p class="dash-placeholder-lead">Aqui poderás consultar os teus planos, simulados e sessões com o assistente.</p><div class="dash-coming-soon"><b>AINDA SEM ACTIVIDADES</b><p>O histórico será preenchido quando as ferramentas estiverem ligadas e guardarem os teus resultados.</p></div></section>'
     } else if (view === 'account') {
