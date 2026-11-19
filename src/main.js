@@ -1,4 +1,6 @@
 import './style.css'
+import { renderAuth, renderStudentPanel } from './auth.js'
+import { supabase, isSupabaseConfigured } from './lib/supabase.js'
 
 const checkoutUrls = {
   starter: import.meta.env.VITE_KURSINHA_STARTER_URL || '',
@@ -32,6 +34,7 @@ app.innerHTML = `
     <div class="container nav-wrap">
       <a class="brand" href="#inicio" aria-label="Prepara — início"><span class="brand-mark">P</span><span>prepara<span class="brand-dot">.</span></span></a>
       <button class="menu-toggle" aria-label="Abrir menu" aria-expanded="false">${icon('menu')}</button>
+      <div class="header-actions"><a class="login-link" href="#entrar">Entrar</a><a class="button button-small button-outline header-cta" href="#criar-conta">Criar conta</a></div>
       <nav class="main-nav" aria-label="Navegação principal">
         <a href="#funcionalidades">Funcionalidades</a>
         <a href="#como-funciona">Como funciona</a>
@@ -168,3 +171,13 @@ document.querySelectorAll('[data-plan]').forEach(button => {
     }
   })
 })
+
+async function renderRoute() {
+ const route = window.location.hash.replace('#', '')
+ if (route === 'entrar' || route === 'criar-conta') await renderAuth(app, route === 'criar-conta' ? 'signup' : 'login')
+ else if (route === 'painel') await renderStudentPanel(app)
+ else if (!app.querySelector('.site-header')) window.location.reload()
+}
+window.addEventListener('hashchange', renderRoute)
+if (isSupabaseConfigured && supabase) supabase.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT' && window.location.hash === '#painel') window.location.hash = '#entrar' })
+if (['#entrar', '#criar-conta', '#painel'].includes(window.location.hash)) renderRoute()
