@@ -1,59 +1,47 @@
 import { supabase, isSupabaseConfigured } from './lib/supabase.js'
 
-const iconArrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>'
-
-function escapeHtml(value = '') {
-  return String(value).replace(/[&<>"']/g, char => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  })[char])
+const arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>'
+const ico = (name) => {
+  const paths = {
+    home:'<path d="m3 10 9-7 9 7v10h-7v-7h-4v7H3z"/>',
+    calendar:'<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 11h18"/>',
+    file:'<path d="M14 2H6a2 2 0 0 0-2 2v16h16V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>',
+    spark:'<path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3Z"/>',
+    history:'<path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
+    user:'<circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/>',
+    book:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/>',
+    video:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/>',
+    logout:'<path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/>'
+  }
+  return '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + (paths[name] || paths.spark) + '</svg>'
 }
-
-function authShell(content) {
-  return `
-    <main class="auth-screen">
-      <div class="auth-glow"></div>
-      <a class="brand auth-brand" href="#inicio"><span class="brand-mark">P</span><span>prepara<span class="brand-dot">.</span></span></a>
-      <section class="auth-card">${content}</section>
-      <p class="auth-back"><a href="#inicio">← Voltar à página inicial</a></p>
-    </main>`
+function esc(value = '') {
+  return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 }
-
-function showMessage(message, type = 'error') {
+function shell(content) {
+  return '<main class="auth-screen"><div class="auth-glow"></div><a class="brand auth-brand" href="#inicio"><span class="brand-mark">P</span><span>prepara<span class="brand-dot">.</span></span></a><section class="auth-card">' + content + '</section><p class="auth-back"><a href="#inicio">← Voltar à página inicial</a></p></main>'
+}
+function message(text, type = 'error') {
   const el = document.querySelector('.auth-message')
   if (!el) return
-  el.textContent = message
-  el.className = `auth-message ${type === 'success' ? 'message-success' : 'message-error'}`
+  el.textContent = text
+  el.className = 'auth-message ' + (type === 'success' ? 'message-success' : 'message-error')
   el.hidden = false
 }
 
 export async function renderAuth(app, mode = 'login') {
   if (!isSupabaseConfigured) {
-    app.innerHTML = authShell(`
-      <div class="auth-eyebrow">CONFIGURAÇÃO NECESSÁRIA</div>
-      <h1>Estamos a preparar a tua área.</h1>
-      <p class="auth-description">A autenticação será ativada assim que ligarmos o projeto Prepara ao Supabase.</p>
-      <div class="setup-callout">Adiciona <code>VITE_SUPABASE_URL</code> e <code>VITE_SUPABASE_ANON_KEY</code> às variáveis de ambiente do Vercel.</div>
-      <a class="button button-primary auth-submit" href="#inicio">Voltar ao início ${iconArrow}</a>
-    `)
+    app.innerHTML = shell('<div class="auth-eyebrow">CONFIGURAÇÃO NECESSÁRIA</div><h1>Estamos a preparar a tua área.</h1><p class="auth-description">A autenticação será ativada assim que ligarmos o projeto Prepara ao Supabase.</p><div class="setup-callout">Adiciona <code>VITE_SUPABASE_URL</code> e <code>VITE_SUPABASE_ANON_KEY</code> às variáveis de ambiente do Vercel.</div><a class="button button-primary auth-submit" href="#inicio">Voltar ao início ' + arrow + '</a>')
     return
   }
-
-  const isSignup = mode === 'signup'
-  app.innerHTML = authShell(`
-    <div class="auth-eyebrow">A TUA JORNADA COMEÇA AQUI</div>
-    <h1>${isSignup ? 'Cria a tua conta.' : 'Bem-vindo de volta.'}</h1>
-    <p class="auth-description">${isSignup ? 'Regista-te para preparares os teus estudos com mais estratégia.' : 'Entra na tua conta para continuares a tua preparação.'}</p>
-    <form class="auth-form" id="auth-form">
-      ${isSignup ? '<label>Nome completo<input name="full_name" type="text" autocomplete="name" placeholder="Como te chamas?" minlength="2" required></label>' : ''}
-      <label>Endereço de e-mail<input name="email" type="email" autocomplete="email" placeholder="exemplo@email.com" required></label>
-      <label>Palavra-passe<input name="password" type="password" autocomplete="${isSignup ? 'new-password' : 'current-password'}" placeholder="Mínimo de 8 caracteres" minlength="8" required></label>
-      <p class="auth-message" hidden role="status"></p>
-      <button class="button button-primary auth-submit" type="submit">${isSignup ? 'Criar conta' : 'Entrar'} ${iconArrow}</button>
-    </form>
-    <p class="auth-switch">${isSignup ? 'Já tens uma conta?' : 'Ainda não tens conta?'} <a href="#${isSignup ? 'entrar' : 'criar-conta'}">${isSignup ? 'Entrar' : 'Criar conta'}</a></p>
-    <p class="auth-legal">Ao continuar, concordas com as condições de utilização da Prepara.</p>
-  `)
-
+  const signup = mode === 'signup'
+  app.innerHTML = shell(
+    '<div class="auth-eyebrow">A TUA JORNADA COMEÇA AQUI</div><h1>' + (signup ? 'Cria a tua conta.' : 'Bem-vindo de volta.') + '</h1><p class="auth-description">' + (signup ? 'Regista-te para preparares os teus estudos com mais estratégia.' : 'Entra na tua conta para continuares a tua preparação.') + '</p>' +
+    '<form class="auth-form" id="auth-form">' +
+    (signup ? '<label>Nome completo<input name="full_name" type="text" autocomplete="name" placeholder="Como te chamas?" minlength="2" required></label>' : '') +
+    '<label>Endereço de e-mail<input name="email" type="email" autocomplete="email" placeholder="exemplo@email.com" required></label><label>Palavra-passe<input name="password" type="password" autocomplete="' + (signup ? 'new-password' : 'current-password') + '" placeholder="Mínimo de 8 caracteres" minlength="8" required></label><p class="auth-message" hidden role="status"></p><button class="button button-primary auth-submit" type="submit">' + (signup ? 'Criar conta' : 'Entrar') + ' ' + arrow + '</button></form>' +
+    '<p class="auth-switch">' + (signup ? 'Já tens uma conta?' : 'Ainda não tens conta?') + ' <a href="#' + (signup ? 'entrar' : 'criar-conta') + '">' + (signup ? 'Entrar' : 'Criar conta') + '</a></p><p class="auth-legal">Ao continuar, concordas com as condições de utilização da Prepara.</p>'
+  )
   const form = document.querySelector('#auth-form')
   form.addEventListener('submit', async event => {
     event.preventDefault()
@@ -64,109 +52,80 @@ export async function renderAuth(app, mode = 'login') {
     submit.disabled = true
     submit.textContent = 'A processar...'
     try {
-      if (isSignup) {
+      if (signup) {
         const fullName = String(data.get('full_name')).trim()
-        const { data: result, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName },
-            emailRedirectTo: window.location.origin + '/#entrar',
-          },
-        })
+        const {data: result, error} = await supabase.auth.signUp({email,password,options:{data:{full_name:fullName},emailRedirectTo:window.location.origin + '/#entrar'}})
         if (error) throw error
-        if (result.session) {
-          window.location.hash = '#painel'
-        } else {
-          showMessage('Conta criada. Verifica o teu e-mail para confirmares o registo antes de entrares.', 'success')
-          form.reset()
-        }
+        if (result.session) window.location.hash = '#painel'
+        else { message('Conta criada. Verifica o teu e-mail para confirmares o registo antes de entrares.', 'success'); form.reset() }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        const {error} = await supabase.auth.signInWithPassword({email,password})
         if (error) throw error
         window.location.hash = '#painel'
       }
-    } catch (error) {
-      showMessage(error.message || 'Não foi possível concluir a operação. Tenta novamente.')
-    } finally {
-      submit.disabled = false
-      submit.innerHTML = `${isSignup ? 'Criar conta' : 'Entrar'} ${iconArrow}`
-    }
+    } catch (error) { message(error.message || 'Não foi possível concluir a operação. Tenta novamente.') }
+    finally { submit.disabled = false; submit.innerHTML = (signup ? 'Criar conta' : 'Entrar') + ' ' + arrow }
   })
 }
 
 export async function renderStudentPanel(app) {
-  if (!isSupabaseConfigured) {
-    window.location.hash = '#entrar'
-    return
-  }
-
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-  if (sessionError || !session) {
-    window.location.hash = '#entrar'
-    return
-  }
-
+  if (!isSupabaseConfigured) { window.location.hash = '#entrar'; return }
+  const {data:{session}, error:sessionError} = await supabase.auth.getSession()
+  if (sessionError || !session) { window.location.hash = '#entrar'; return }
   const name = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Estudante'
-
-  // Primeiro lemos todas as subscrições deste utilizador para diagnosticar
-  // estados diferentes de "active" e evitar esconder erros do Supabase.
-  const { data: subscriptions, error: subscriptionError } = await supabase
-    .from('subscriptions')
-    .select('plan,status,expires_at,created_at,user_id')
-    .eq('user_id', session.user.id)
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  if (subscriptionError) {
-    app.innerHTML = authShell(`
-      <div class="auth-eyebrow">ÁREA DO ESTUDANTE</div>
-      <h1>Olá, ${escapeHtml(name)}.</h1>
-      <p class="auth-description">A tua conta está autenticada, mas não conseguimos consultar a subscrição.</p>
-      <div class="setup-callout"><strong>Erro do Supabase:</strong><br>${escapeHtml(subscriptionError.message)}<br><br><strong>Conta autenticada:</strong><br>${escapeHtml(session.user.email || 'E-mail não disponível')}</div>
-      <button class="button button-outline auth-submit" id="logout-button" type="button">Terminar sessão</button>
-    `)
-    document.querySelector('#logout-button').addEventListener('click', async () => {
-      await supabase.auth.signOut()
-      window.location.hash = '#inicio'
-    })
+  const first = name.trim().split(/\s+/)[0]
+  const {data:subs, error} = await supabase.from('subscriptions').select('plan,status,expires_at,created_at,user_id').eq('user_id',session.user.id).order('created_at',{ascending:false}).limit(5)
+  if (error) {
+    app.innerHTML = shell('<div class="auth-eyebrow">ÁREA DO ESTUDANTE</div><h1>Olá, ' + esc(name) + '.</h1><p class="auth-description">Não conseguimos consultar a tua subscrição.</p><div class="setup-callout">' + esc(error.message) + '</div><button class="button button-outline auth-submit" id="logout-button">Terminar sessão</button>')
+    document.querySelector('#logout-button').addEventListener('click', async () => { await supabase.auth.signOut(); window.location.hash = '#inicio' })
     return
   }
+  const active = (subs || []).find(s => s.status === 'active' && (!s.expires_at || new Date(s.expires_at).getTime() > Date.now()))
+  const latest = subs?.[0]
+  const plan = active?.plan === 'pro' ? 'pro' : active?.plan === 'starter' ? 'starter' : null
+  const planLabel = plan ? plan.toUpperCase() : 'SEM PLANO'
+  const planInfo = active ? 'A tua subscrição está activa. Aproveita as ferramentas disponíveis no teu plano.' : latest ? 'A tua última subscrição está com o estado "' + latest.status + '". Se fizeste um pagamento, a confirmação poderá estar pendente.' : 'Ainda não existe uma subscrição associada à tua conta. Escolhe um plano para começares.'
+  const items = [['overview','Visão geral','home'],['study','Plano de estudos','calendar'],['exams','Gerar simulados','file'],['assistant','Assistente IA','spark'],['history','Histórico','history'],['account','Minha conta','user']]
+  let view = 'overview'
 
-  const now = Date.now()
-  const active = (subscriptions || []).find(item =>
-    item.status === 'active' && (!item.expires_at || new Date(item.expires_at).getTime() > now)
-  )
-  const latest = subscriptions?.[0]
-
-  let planTitle = 'Ainda não tens um plano ativo'
-  let planDescription = 'Escolhe um plano na página inicial e conclui a inscrição para desbloqueares as ferramentas.'
-  if (active) {
-    planTitle = active.plan.toUpperCase()
-    planDescription = 'A tua subscrição está ativa.'
-  } else if (latest) {
-    planDescription = `Encontrámos uma subscrição com estado "${latest.status}". Se acabaste de efectuar uma activação, confirma os dados no Supabase.`
-  } else {
-    planDescription = 'Não encontrámos subscrições associadas a esta conta.'
+  function renderContent() {
+    const area = document.querySelector('#dashboard-content')
+    if (!area) return
+    document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view))
+    if (view === 'overview') {
+      area.innerHTML =
+        '<div class="dash-welcome"><div><span class="dash-eyebrow">O TEU ESPAÇO DE PREPARAÇÃO</span><h1>Olá, ' + esc(first) + '. <span>✦</span></h1><p>Grandes resultados começam com pequenos passos consistentes.</p></div><div class="dash-date">' + new Intl.DateTimeFormat('pt-AO',{day:'numeric',month:'long',year:'numeric'}).format(new Date()) + '</div></div>' +
+        '<section class="dash-plan-card"><div><span class="dash-eyebrow">O TEU PLANO ACTUAL</span><h2>' + planLabel + '</h2><p>' + esc(planInfo) + '</p></div><span class="dash-plan-badge ' + (plan ? 'is-active' : '') + '">' + (plan ? '● ACTIVO' : '● POR ACTIVAR') + '</span></section>' +
+        '<div class="dash-section-title"><div><span class="dash-eyebrow">FERRAMENTAS DE ESTUDO</span><h2>O que vamos estudar hoje?</h2></div></div>' +
+        '<div class="dash-tool-grid">' +
+        [['study','calendar','Plano de estudos','Organiza a tua preparação por objectivos.'],['exams','file','Gerar simulados','Pratica com exercícios e provas de treino.'],['assistant','spark','Assistente académico IA','Esclarece dúvidas e aprofunda matérias.']].map(x => '<button class="dash-tool-card" data-open-view="' + x[0] + '"><span class="dash-tool-icon">' + ico(x[1]) + '</span><b>' + x[2] + '</b><small>' + x[3] + '</small><span class="dash-card-link">Abrir ferramenta ' + arrow + '</span></button>').join('') +
+        '</div>' +
+        (plan === 'pro' ? '<section class="dash-pro-card"><div class="dash-pro-icon">' + ico('book') + '</div><div><span class="dash-eyebrow">BENEFÍCIOS PRO</span><h3>O teu acompanhamento exclusivo</h3><p>O livro de técnicas de estudo e as aulas semanais estarão reunidos nesta área.</p></div><button class="dash-secondary-button" data-open-view="pro">Ver benefícios ' + arrow + '</button></section>' :
+        '<section class="dash-upgrade-card"><div><span class="dash-eyebrow">QUERES IR MAIS LONGE?</span><h3>Descobre a experiência Prepara Pro.</h3><p>Inclui técnicas de estudo e acompanhamento semanal.</p></div><a class="dash-primary-button" href="#planos">Conhecer o Pro ' + arrow + '</a></section>') +
+        '<p class="dash-footnote">O painel está em desenvolvimento. As ferramentas serão activadas nas próximas etapas.</p>'
+    } else if (['study','exams','assistant'].includes(view)) {
+      const d = {
+        study:['PLANEAMENTO INTELIGENTE','O teu plano de estudos','Vamos transformar os teus objectivos num calendário de preparação.','O gerador será implementado nesta etapa. Poderás indicar a prova, as disciplinas, a data e o tempo disponível.'],
+        exams:['PRÁTICA E AVALIAÇÃO','Gerar provas e simulados','Testa os teus conhecimentos antes do dia da avaliação.','O gerador será implementado nesta etapa, com selecção de disciplina, matéria, dificuldade e correcção.'],
+        assistant:['APRENDIZAGEM COM IA','Assistente académico','Faz perguntas e compreende a matéria com explicações passo a passo.','O assistente será ligado ao modelo de IA numa etapa própria, com respostas orientadas para aprendizagem.']
+      }[view]
+      area.innerHTML = '<section class="dash-placeholder"><span class="dash-placeholder-icon">' + ico(view === 'study' ? 'calendar' : view === 'exams' ? 'file' : 'spark') + '</span><span class="dash-eyebrow">' + d[0] + '</span><h1>' + d[1] + '</h1><p class="dash-placeholder-lead">' + d[2] + '</p><div class="dash-coming-soon"><b>EM DESENVOLVIMENTO</b><p>' + d[3] + '</p></div><button class="dash-secondary-button" data-open-view="overview">Voltar à visão geral</button></section>'
+    } else if (view === 'history') {
+      area.innerHTML = '<section class="dash-placeholder"><span class="dash-placeholder-icon">' + ico('history') + '</span><span class="dash-eyebrow">A TUA EVOLUÇÃO</span><h1>Histórico de actividades</h1><p class="dash-placeholder-lead">Aqui poderás consultar os teus planos, simulados e sessões com o assistente.</p><div class="dash-coming-soon"><b>AINDA SEM ACTIVIDADES</b><p>O histórico será preenchido quando as ferramentas estiverem ligadas e guardarem os teus resultados.</p></div></section>'
+    } else if (view === 'account') {
+      area.innerHTML = '<section class="dash-placeholder account-placeholder"><span class="dash-placeholder-icon">' + ico('user') + '</span><span class="dash-eyebrow">DADOS PESSOAIS</span><h1>Minha conta</h1><p class="dash-placeholder-lead">Informações da tua conta Prepara.</p><div class="dash-account-info"><span>Nome</span><b>' + esc(name) + '</b><span>E-mail</span><b>' + esc(session.user.email || '') + '</b><span>Plano</span><b>' + planLabel + '</b><span>Estado</span><b>' + (active ? 'Activo' : esc(latest?.status || 'Sem subscrição')) + '</b></div><button class="dash-logout-button" id="dashboard-logout">' + ico('logout') + ' Terminar sessão</button></section>'
+      document.querySelector('#dashboard-logout')?.addEventListener('click', async () => { await supabase.auth.signOut(); window.location.hash = '#inicio' })
+    } else if (view === 'pro') {
+      area.innerHTML = '<section class="dash-placeholder"><span class="dash-placeholder-icon">' + ico('book') + '</span><span class="dash-eyebrow">EXCLUSIVO PRO</span><h1>Benefícios do teu plano Pro</h1><p class="dash-placeholder-lead">Uma experiência que combina ferramentas digitais com acompanhamento.</p><div class="dash-benefit-list"><div>' + ico('book') + '<span><b>Livro de técnicas de estudo</b><small>Material exclusivo para melhorares o teu método.</small></span></div><div>' + ico('video') + '<span><b>Aulas ao vivo semanais</b><small>Uma aula por semana, durante o mês.</small></span></div><div>' + ico('spark') + '<span><b>Acompanhamento</b><small>Orientação para manteres consistência e foco.</small></span></div></div><p class="dash-footnote">A área de conteúdos e calendário das aulas será activada numa próxima fase.</p></section>'
+    }
+    area.querySelectorAll('[data-open-view]').forEach(b => b.addEventListener('click', () => { view = b.dataset.openView; renderContent() }))
   }
 
-  app.innerHTML = authShell(`
-    <div class="auth-eyebrow">ÁREA DO ESTUDANTE</div>
-    <h1>Olá, ${escapeHtml(name)}.</h1>
-    <p class="auth-description">Bem-vindo à tua área pessoal da Prepara.</p>
-    <div class="student-plan">
-      <span class="student-plan-label">O TEU PLANO</span>
-      <strong>${escapeHtml(planTitle)}</strong>
-      <p>${escapeHtml(planDescription)}</p>
-      <small style="display:block;margin-top:10px;opacity:.7">Conta: ${escapeHtml(session.user.email || '')}</small>
-    </div>
-    <div class="student-actions">
-      <a class="button button-primary auth-submit" href="#planos">Ver planos ${iconArrow}</a>
-      <button class="button button-outline auth-submit" id="logout-button" type="button">Terminar sessão</button>
-    </div>
-  `)
-  document.querySelector('#logout-button').addEventListener('click', async () => {
-    await supabase.auth.signOut()
-    window.location.hash = '#inicio'
-  })
+  app.innerHTML = '<main class="student-dashboard"><aside class="dash-sidebar"><a class="brand dash-brand" href="#inicio"><span class="brand-mark">P</span><span>prepara<span class="brand-dot">.</span></span></a><div class="dash-sidebar-label">MENU PRINCIPAL</div><nav class="dash-nav">' +
+    items.map(x => '<button data-view="' + x[0] + '" type="button">' + ico(x[2]) + '<span>' + x[1] + '</span></button>').join('') +
+    '</nav>' + (plan ? '<div class="dash-sidebar-plan ' + (plan === 'pro' ? 'pro' : '') + '"><span>PLANO ACTIVO</span><b>PREPARA ' + planLabel + '</b><small>A tua subscrição está activa.</small></div>' : '<div class="dash-sidebar-plan"><span>O TEU PLANO</span><b>' + planLabel + '</b><small>Escolhe um plano para começar.</small><a href="#planos">Ver planos ' + arrow + '</a></div>') +
+    '<button class="dash-logout-button" id="sidebar-logout">' + ico('logout') + '<span>Terminar sessão</span></button></aside><section class="dash-main"><header class="dash-topbar"><span class="dash-topbar-label">PREPARA / ÁREA DO ESTUDANTE</span><div class="dash-user"><span class="dash-avatar">' + esc(first.charAt(0).toUpperCase()) + '</span><span>' + esc(first) + '</span></div></header><div class="dash-content" id="dashboard-content"></div></section></main>'
+  document.querySelectorAll('.dash-nav [data-view]').forEach(b => b.addEventListener('click', () => { view = b.dataset.view; renderContent() }))
+  document.querySelector('#sidebar-logout').addEventListener('click', async () => { await supabase.auth.signOut(); window.location.hash = '#inicio' })
+  renderContent()
 }
